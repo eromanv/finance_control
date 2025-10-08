@@ -34,21 +34,13 @@ jobs:
 
             # Get latest code
             git fetch --all --prune
-            git reset --hard origin/main
+            git pull origin master
+            
+            # Pull database image
+            docker-compose pull db || true
 
             # Rebuild and restart bot container
-            if command -v docker-compose >/dev/null 2>&1; then
-              docker-compose pull db || true
-              docker-compose up -d --build --no-deps bot
-            elif command -v docker >/dev/null 2>&1; then
-              docker compose pull db --ignore-pull-failures || true
-              docker compose up -d --build --no-deps bot
-            fi
-
-            # Run migrations if alembic available
-            if command -v uv >/dev/null 2>&1; then
-              uv run alembic upgrade head || true
-            fi
+            docker-compose up --build --no-deps -d bot
 
             echo "Deploy finished"
           EOF
