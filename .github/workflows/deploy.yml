@@ -55,10 +55,11 @@ jobs:
             git reset --hard origin/main
 
             # Pull images (if using docker images) and rebuild
-            if command -v docker >/dev/null 2>&1; then
+            if command -v docker-compose >/dev/null 2>&1; then
+              docker-compose pull db || true
+              docker-compose up -d --build --no-deps bot
+            elif command -v docker >/dev/null 2>&1; then
               docker compose pull db --ignore-pull-failures || true
-              docker compose up -d --build --no-deps bot
-            fi
 
             # Try running migrations if alembic available
             if command -v uv >/dev/null 2>&1; then
