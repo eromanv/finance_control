@@ -1,23 +1,36 @@
-version: '3.8'
+version: "3.8"
 
 services:
   bot:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: finance_control_bot:latest
+    container_name: finance_control_bot
     env_file:
       - .env
-    depends_on:
-      - db
+    # depends_on:
+    #   - db
     restart: unless-stopped
+    networks:
+      - finance_network
 
-  db:
-    image: postgres:15
-    env_file:
-      - .env
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
-    restart: unless-stopped
+  # db:
+  #   image: postgres:15
+  #   container_name: finance_control_db
+  #   env_file:
+  #     - .env
+  #   volumes:
+  #     - postgres_data:/var/lib/postgresql/data
+  #   ports:
+  #     - "5432:5432"
+  #   restart: unless-stopped
+  #   networks:
+  #     - finance_network
 
-volumes:
-  postgres_data:
+# volumes:
+#   postgres_data:
+
+networks:
+  finance_network:
+    driver: bridge
