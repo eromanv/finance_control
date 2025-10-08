@@ -15,6 +15,8 @@ class CategoryENUM(str, Enum):
     SCOOTER = "самокат"
     CLOTHING = "одежда"
     RESTAURANTS = "рестораны"
+    PHARMACY = "аптека"
+    EXTRA_SNACKS = "перекусы лишние"
 
 
 class ExpenseCreateSchema(BaseModel):
