@@ -1,0 +1,70 @@
+name: Deploy to server
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  deploy:
+    name: Deploy to remote host
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check secrets
+        run: |
+          echo "Checking secrets..."
+          host="${{ secrets.SSH_HOST }}"
+          user="${{ secrets.SSH_USER }}"
+          ssh_key="${{ secrets.SSH_PRIVATE_KEY }}"
+          passphrase="${{ secrets.SSH_PASSPHRASE }}"
+          [ -n "$host" ] || (echo "SSH_HOST is not set" && exit 1)
+          [ -n "$user" ] || (echo "SSH_USER is not set" && exit 1)
+          [ -n "$ssh_key" ] || (echo "SSH_PRIVATE_KEY is not set" && exit 1)
+          echo "All required secrets are set."
+          echo "Lengths:"
+          echo "SSH_HOST: ${#host}"
+          echo "SSH_USER: ${#user}"
+          echo "SSH_PRIVATE_KEY: ${#ssh_key}"
+          echo "SSH key fingerprint:"
+          echo "$ssh_key" > temp_key
+          chmod 600 temp_key
+          ssh-keygen -y -f temp_key | ssh-keygen -lf -
+          rm temp_key
+
+      - name: Debug SSH key
+        run: |
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > temp_key
+          chmod 600 temp_key
+          echo "SSH key info:"
+          ssh-keygen -lf temp_key
+          rm temp_key
+
+      - name: Deploy to server over SSH
+        run: |
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > deploy_key
+          chmod 600 deploy_key
+          ssh -o StrictHostKeyChecking=no -i deploy_key -p 22 ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
+            set -e
+            echo "Deploy started on $(hostname)"
+            cd /root/finance_control
+
+            # ensure clean working copy and get latest main
+            git fetch --all --prune
+            git reset --hard origin/main
+
+            # Pull images (if using docker images) and rebuild
+            if command -v docker >/dev/null 2>&1; then
+              docker compose pull --ignore-pull-failures || true
+              docker compose up -d --build --remove-orphans
+            fi
+
+            # Try running migrations if alembic available
+            if command -v uv >/dev/null 2>&1; then
+              uv run alembic upgrade head || true
+            fi
+
+            echo "Deploy finished"
+          EOF
+          rm deploy_key
