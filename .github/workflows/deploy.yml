@@ -18,28 +18,10 @@ jobs:
           host="${{ secrets.SSH_HOST }}"
           user="${{ secrets.SSH_USER }}"
           ssh_key="${{ secrets.SSH_PRIVATE_KEY }}"
-          passphrase="${{ secrets.SSH_PASSPHRASE }}"
           [ -n "$host" ] || (echo "SSH_HOST is not set" && exit 1)
           [ -n "$user" ] || (echo "SSH_USER is not set" && exit 1)
           [ -n "$ssh_key" ] || (echo "SSH_PRIVATE_KEY is not set" && exit 1)
           echo "All required secrets are set."
-          echo "Lengths:"
-          echo "SSH_HOST: ${#host}"
-          echo "SSH_USER: ${#user}"
-          echo "SSH_PRIVATE_KEY: ${#ssh_key}"
-          echo "SSH key fingerprint:"
-          echo "$ssh_key" > temp_key
-          chmod 600 temp_key
-          ssh-keygen -y -f temp_key | ssh-keygen -lf -
-          rm temp_key
-
-      - name: Debug SSH key
-        run: |
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > temp_key
-          chmod 600 temp_key
-          echo "SSH key info:"
-          ssh-keygen -lf temp_key
-          rm temp_key
 
       - name: Deploy to server over SSH
         run: |
@@ -50,18 +32,20 @@ jobs:
             echo "Deploy started on $(hostname)"
             cd /root/finance_control
 
-            # ensure clean working copy and get latest main
+            # Get latest code
             git fetch --all --prune
             git reset --hard origin/main
 
-            # Pull images (if using docker images) and rebuild
+            # Rebuild and restart bot container
             if command -v docker-compose >/dev/null 2>&1; then
               docker-compose pull db || true
               docker-compose up -d --build --no-deps bot
             elif command -v docker >/dev/null 2>&1; then
               docker compose pull db --ignore-pull-failures || true
+              docker compose up -d --build --no-deps bot
+            fi
 
-            # Try running migrations if alembic available
+            # Run migrations if alembic available
             if command -v uv >/dev/null 2>&1; then
               uv run alembic upgrade head || true
             fi
