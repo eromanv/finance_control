@@ -34,8 +34,8 @@ jobs:
 
             # Get latest code
             git fetch --all --prune
-            git pull origin master
-            
+            git pull origin main
+
             # Pull database image
             docker-compose pull db || true
 
