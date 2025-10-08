@@ -34,13 +34,21 @@ jobs:
 
             # Get latest code
             git fetch --all --prune
-            git pull origin main
+            git reset --hard origin/main
 
-            # Pull database image
-            docker-compose pull db || true
+            # Stop and remove old bot container
+            docker-compose stop bot || true
+            docker-compose rm -f bot || true
+            
+            # Remove old bot image to avoid conflicts
+            docker rmi finance_control_bot || true
 
-            # Rebuild and restart bot container
-            docker-compose up --build --no-deps -d bot
+            # Build and start bot container (db service is commented out)
+            docker-compose build bot
+            docker-compose up -d bot
+
+            # Clean up unused images
+            docker image prune -f || true
 
             echo "Deploy finished"
           EOF
