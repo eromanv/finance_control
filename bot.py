@@ -42,7 +42,7 @@ def get_category_keyboard():
     """Generate inline keyboard with categories in multiple rows."""
     categories = list(CategoryENUM)
     keyboard = []
-
+    
     # Split categories into rows of 2 buttons each
     for i in range(0, len(categories), 2):
         row = []
@@ -51,11 +51,12 @@ def get_category_keyboard():
                 category = categories[i + j]
                 row.append(
                     InlineKeyboardButton(
-                        text=category.value, callback_data=f"category_{category.name}"
+                        text=category.value, 
+                        callback_data=f"category_{category.name}"
                     )
                 )
         keyboard.append(row)
-
+    
     return InlineKeyboardMarkup(inline_keyboard=keyboard)
 
 
@@ -147,7 +148,7 @@ async def main():
     await dp.start_polling(bot)
 
 
-if __name__ == "__main__":
+    import asynciomain__":
     import asyncio
-
+    asyncio.run(main())
     asyncio.run(main())
