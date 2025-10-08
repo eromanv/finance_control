@@ -10,7 +10,6 @@ from aiogram.types import (
     KeyboardButton,
     ReplyKeyboardMarkup,
 )
-
 from config import BOT_TOKEN
 from database import async_session
 from schemas import CategoryENUM, ExpenseCreateSchema
@@ -40,15 +39,23 @@ main_menu = ReplyKeyboardMarkup(
 
 # Category inline keyboard
 def get_category_keyboard():
+    """Generate inline keyboard with categories in multiple rows."""
+    categories = list(CategoryENUM)
     keyboard = []
-    for category in CategoryENUM:
-        keyboard.append(
-            [
-                InlineKeyboardButton(
-                    text=category.value, callback_data=f"category_{category.name}"
+
+    # Split categories into rows of 2 buttons each
+    for i in range(0, len(categories), 2):
+        row = []
+        for j in range(2):
+            if i + j < len(categories):
+                category = categories[i + j]
+                row.append(
+                    InlineKeyboardButton(
+                        text=category.value, callback_data=f"category_{category.name}"
+                    )
                 )
-            ]
-        )
+        keyboard.append(row)
+
     return InlineKeyboardMarkup(inline_keyboard=keyboard)
 
 
