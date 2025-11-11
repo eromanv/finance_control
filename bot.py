@@ -51,7 +51,7 @@ def get_category_keyboard():
                 category = categories[i + j]
                 row.append(
                     InlineKeyboardButton(
-                        text=category.value, callback_data=f"category_{category.name}"
+                        text=category.value, callback_data=f"category_{category.value}"
                     )
                 )
         keyboard.append(row)
@@ -79,12 +79,21 @@ async def category_callback_handler(
     callback_query: types.CallbackQuery, state: FSMContext
 ):
     """Handle category selection."""
-    category_name = callback_query.data.split("_")[1]
-    category = CategoryENUM[category_name]
-    await state.update_data(category=category)
-    await callback_query.message.edit_text("Введите сумму траты:")
-    await state.set_state(ExpenseState.waiting_for_amount)
-    await callback_query.answer()
+    category_value = callback_query.data.split("_", 1)[
+        1
+    ]  # Get everything after first underscore
+    try:
+        # Find category by value
+        category = next(cat for cat in CategoryENUM if cat.value == category_value)
+        await state.update_data(category=category)
+        await callback_query.message.edit_text("Введите сумму траты:")
+        await state.set_state(ExpenseState.waiting_for_amount)
+        await callback_query.answer()
+    except StopIteration:
+        await callback_query.message.edit_text(
+            "Категория не найдена. Попробуйте снова."
+        )
+        await callback_query.answer()
 
 
 @dp.message(ExpenseState.waiting_for_amount)
