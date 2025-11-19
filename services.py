@@ -51,8 +51,7 @@ async def _fetch_total_value(
 async def _fetch_daily_totals(
     db: AsyncSession, user_id: int, start: datetime, end: datetime
 ) -> List[ExpenseDaySchema]:
-    # For SQLite compatibility, use strftime instead of date_trunc
-    day_column = func.strftime("%Y-%m-%d", ExpenseModel.date).label("day")
+    day_column = _build_daily_group_expr(db).label("day")
     query = (
         select(day_column, func.sum(ExpenseModel.amount).label("total"))
         .where(
@@ -66,12 +65,31 @@ async def _fetch_daily_totals(
     result = await db.execute(query)
     rows = result.all()
     return [
-        ExpenseDaySchema(
-            date=datetime.strptime(row.day, "%Y-%m-%d").date(),
-            total=float(row.total)
-        )
+        ExpenseDaySchema(date=_normalize_day_value(row.day), total=float(row.total))
         for row in rows
     ]
+
+
+def _build_daily_group_expr(db: AsyncSession):
+    bind = getattr(db, "bind", None)
+    dialect_name = None
+    if bind is not None and getattr(bind, "dialect", None) is not None:
+        dialect_name = bind.dialect.name
+    if dialect_name == "sqlite":
+        return func.strftime("%Y-%m-%d", ExpenseModel.date)
+    if dialect_name == "postgresql":
+        return func.date_trunc("day", ExpenseModel.date)
+    return func.date(ExpenseModel.date)
+
+
+def _normalize_day_value(value):
+    if isinstance(value, date):
+        return value
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, str):
+        return datetime.strptime(value, "%Y-%m-%d").date()
+    return value
 
 
 async def get_period_summary(
