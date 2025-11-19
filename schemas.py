@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from enum import Enum
 
 from pydantic import BaseModel
@@ -34,3 +34,13 @@ class ExpenseSchema(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class ExpenseDaySchema(BaseModel):
+    date: date
+    total: float
+
+
+class ExpensePeriodSummarySchema(BaseModel):
+    total: float
+    daily_totals: list[ExpenseDaySchema]

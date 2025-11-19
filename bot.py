@@ -1,19 +1,20 @@
 import logging
 
+import matplotlib
+
+matplotlib.use("Agg")
+
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from aiogram.types import (
-    InlineKeyboardButton,
-    InlineKeyboardMarkup,
-    KeyboardButton,
-    ReplyKeyboardMarkup,
-)
+from aiogram.types import (InlineKeyboardButton, InlineKeyboardMarkup,
+                           KeyboardButton, ReplyKeyboardMarkup)
+from charts import build_period_snapshot_chart
 from config import BOT_TOKEN
 from database import async_session
 from schemas import CategoryENUM, ExpenseCreateSchema
-from services import add_expense, get_month_expenses, get_today_expenses
+from services import add_expense, get_month_summary, get_today_summary
 
 logging.basicConfig(level=logging.INFO)
 
@@ -119,30 +120,60 @@ async def amount_handler(message: types.Message, state: FSMContext):
 async def view_today_handler(message: types.Message):
     """View today's expenses."""
     async with async_session() as db:
-        expenses = await get_today_expenses(db, message.from_user.id)
-    if not expenses:
+        summary = await get_today_summary(db, message.from_user.id)
+    if summary.total == 0:
         await message.reply("Сегодня трат нет.", reply_markup=main_menu)
     else:
-        total = sum(exp.amount for exp in expenses)
-        text = f"Траты сегодня: {total:.2f}\n"
-        for exp in expenses:
-            text += f"- {exp.category.value}: {exp.amount:.2f}\n"
-        await message.reply(text, reply_markup=main_menu)
+        text = f"Траты сегодня: {summary.total:.2f} ₽"
+        # Generate chart comparing today vs month
+        month_summary = await get_month_summary(db, message.from_user.id)
+        chart = build_period_snapshot_chart(summary.total, month_summary.total)
+        await message.reply_photo(
+            photo=types.BufferedInputFile(chart.getvalue(), filename="chart.png"),
+            caption=text,
+            reply_markup=main_menu
+        )
 
 
 @dp.message(lambda message: message.text == "Посмотреть траты с начала месяца")
 async def view_month_handler(message: types.Message):
     """View month's expenses."""
     async with async_session() as db:
-        expenses = await get_month_expenses(db, message.from_user.id)
-    if not expenses:
+        summary = await get_month_summary(db, message.from_user.id)
+    if summary.total == 0:
         await message.reply("В этом месяце трат нет.", reply_markup=main_menu)
     else:
-        total = sum(exp.amount for exp in expenses)
-        text = f"Траты с начала месяца: {total:.2f}\n"
-        for exp in expenses:
-            text += f"- {exp.category.value}: {exp.amount:.2f}\n"
-        await message.reply(text, reply_markup=main_menu)
+        text = f"Траты с начала месяца: {summary.total:.2f} ₽"
+        # Generate chart showing daily totals
+        if len(summary.daily_totals) > 1:
+            # Create a line chart for daily expenses
+            from io import BytesIO
+
+            from matplotlib import pyplot as plt
+            
+            dates = [day.date.strftime("%d.%m") for day in summary.daily_totals]
+            totals = [day.total for day in summary.daily_totals]
+            
+            fig, ax = plt.subplots(figsize=(8, 4))
+            ax.plot(dates, totals, marker='o', color='#2196F3')
+            ax.set_title("Дневные траты за месяц")
+            ax.set_xlabel("Дата")
+            ax.set_ylabel("Сумма, ₽")
+            plt.xticks(rotation=45)
+            fig.tight_layout()
+            
+            buffer = BytesIO()
+            fig.savefig(buffer, format="png")
+            buffer.seek(0)
+            plt.close(fig)
+            
+            await message.reply_photo(
+                photo=types.BufferedInputFile(buffer.getvalue(), filename="month_chart.png"),
+                caption=text,
+                reply_markup=main_menu
+            )
+        else:
+            await message.reply(text, reply_markup=main_menu)
 
 
 async def main():
