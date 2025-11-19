@@ -25,3 +25,28 @@ def build_period_snapshot_chart(today_total: float, month_total: float) -> Bytes
     buffer.seek(0)
     plt.close(fig)
     return buffer
+
+
+def build_category_pie_chart(category_totals: list[tuple[str, float]], title: str) -> BytesIO:
+    """Create pie chart from category totals."""
+    labels = [item[0] for item in category_totals]
+    values = [item[1] for item in category_totals]
+    if not values or sum(values) == 0:
+        raise ValueError("Category totals must contain positive values")
+    fig, ax = plt.subplots(figsize=(6, 6))
+    wedges, texts, autotexts = ax.pie(
+        values,
+        labels=labels,
+        autopct="%.1f%%",
+        textprops={"color": "w"},
+        pctdistance=0.8,
+    )
+    ax.set_title(title)
+    for text in texts:
+        text.set_color("black")
+    fig.tight_layout()
+    buffer = BytesIO()
+    fig.savefig(buffer, format="png")
+    buffer.seek(0)
+    plt.close(fig)
+    return buffer

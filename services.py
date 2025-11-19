@@ -2,8 +2,9 @@ from datetime import date, datetime
 from typing import List, Tuple
 
 from models import ExpenseModel
-from schemas import (ExpenseCreateSchema, ExpenseDaySchema,
-                     ExpensePeriodSummarySchema, ExpenseSchema)
+from schemas import (CategorySummarySchema, ExpenseCreateSchema,
+                     ExpenseDaySchema, ExpensePeriodSummarySchema,
+                     ExpenseSchema)
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -92,12 +93,41 @@ def _normalize_day_value(value):
     return value
 
 
+async def _fetch_category_breakdown(
+    db: AsyncSession, user_id: int, start: datetime, end: datetime
+) -> list[CategorySummarySchema]:
+    query = (
+        select(
+            ExpenseModel.category,
+            func.sum(ExpenseModel.amount).label("total"),
+        )
+        .where(
+            ExpenseModel.user_id == user_id,
+            ExpenseModel.date >= start,
+            ExpenseModel.date <= end,
+        )
+        .group_by(ExpenseModel.category)
+        .order_by(func.sum(ExpenseModel.amount).desc())
+    )
+    result = await db.execute(query)
+    rows = result.all()
+    return [
+        CategorySummarySchema(category=row.category or "Неизвестная", total=float(row.total))
+        for row in rows
+    ]
+
+
 async def get_period_summary(
     db: AsyncSession, user_id: int, start: datetime, end: datetime
 ) -> ExpensePeriodSummarySchema:
     total = await _fetch_total_value(db, user_id, start, end)
     daily_totals = await _fetch_daily_totals(db, user_id, start, end)
-    return ExpensePeriodSummarySchema(total=total, daily_totals=daily_totals)
+    category_breakdown = await _fetch_category_breakdown(db, user_id, start, end)
+    return ExpensePeriodSummarySchema(
+        total=total,
+        daily_totals=daily_totals,
+        category_breakdown=category_breakdown,
+    )
 
 
 async def get_today_summary(

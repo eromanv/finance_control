@@ -41,6 +41,12 @@ class ExpenseDaySchema(BaseModel):
     total: float
 
 
+class CategorySummarySchema(BaseModel):
+    category: str
+    total: float
+
+
 class ExpensePeriodSummarySchema(BaseModel):
     total: float
     daily_totals: list[ExpenseDaySchema]
+    category_breakdown: list[CategorySummarySchema]
