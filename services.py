@@ -172,3 +172,36 @@ async def get_month_expenses(db: AsyncSession, user_id: int) -> List[ExpenseSche
     result = await db.execute(query)
     expenses = result.scalars().all()
     return [ExpenseSchema.from_orm(exp) for exp in expenses]
+
+
+async def export_expenses_to_csv(
+    db: AsyncSession, user_id: int, start: datetime, end: datetime
+) -> str:
+    """Export expenses to CSV format and return CSV content as string."""
+    import csv
+    from io import StringIO
+
+    query = (
+        select(ExpenseModel)
+        .where(
+            ExpenseModel.user_id == user_id,
+            ExpenseModel.date >= start,
+            ExpenseModel.date <= end,
+        )
+        .order_by(ExpenseModel.date.desc())
+    )
+    result = await db.execute(query)
+    expenses = result.scalars().all()
+
+    output = StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Date", "Category", "Amount"])
+    for expense in expenses:
+        writer.writerow(
+            [
+                expense.date.strftime("%Y-%m-%d %H:%M:%S"),
+                expense.category,
+                f"{expense.amount:.2f}",
+            ]
+        )
+    return output.getvalue()

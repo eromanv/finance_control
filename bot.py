@@ -14,7 +14,8 @@ from charts import build_category_pie_chart
 from config import BOT_TOKEN
 from database import async_session
 from schemas import CategoryENUM, ExpenseCreateSchema
-from services import add_expense, get_month_summary, get_today_summary
+from services import (add_expense, export_expenses_to_csv, get_month_summary,
+                      get_today_summary)
 
 logging.basicConfig(level=logging.INFO)
 
@@ -33,6 +34,7 @@ main_menu = ReplyKeyboardMarkup(
         [KeyboardButton(text="Внести трату")],
         [KeyboardButton(text="Посмотреть траты сегодня")],
         [KeyboardButton(text="Посмотреть траты с начала месяца")],
+        [KeyboardButton(text="Скачать отчёт")],
     ],
     resize_keyboard=True,
 )
@@ -178,6 +180,67 @@ async def view_month_handler(message: types.Message):
                 await message.reply(text, reply_markup=main_menu)
         else:
             await message.reply(text, reply_markup=main_menu)
+
+
+@dp.message(lambda message: message.text == "Скачать отчёт")
+async def download_report_handler(message: types.Message):
+    """Download financial report as CSV."""
+    # Create inline keyboard for period selection
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="За сегодня", callback_data="report_today"
+                ),
+                InlineKeyboardButton(
+                    text="За месяц", callback_data="report_month"
+                ),
+            ]
+        ]
+    )
+    await message.reply(
+        "Выберите период для отчёта:",
+        reply_markup=keyboard,
+    )
+
+
+@dp.callback_query(lambda c: c.data.startswith("report_"))
+async def report_period_callback_handler(callback_query: types.CallbackQuery):
+    """Handle report period selection."""
+    from datetime import date, datetime
+
+    period = callback_query.data.split("_")[1]
+    user_id = callback_query.from_user.id
+
+    if period == "today":
+        today = date.today()
+        start = datetime.combine(today, datetime.min.time())
+        end = datetime.combine(today, datetime.max.time())
+        filename = f"expenses_today_{today.strftime('%Y%m%d')}.csv"
+    else:  # month
+        today = date.today()
+        start = datetime(today.year, today.month, 1)
+        end = datetime.combine(today, datetime.max.time())
+        filename = f"expenses_month_{today.strftime('%Y%m')}.csv"
+
+    async with async_session() as db:
+        csv_content = await export_expenses_to_csv(db, user_id, start, end)
+
+    if not csv_content or csv_content == "Date,Category,Amount\n":
+        await callback_query.message.edit_text("Нет данных для выгрузки.")
+        await callback_query.answer()
+        return
+
+    # Send CSV file
+    await callback_query.message.reply_document(
+        document=types.BufferedInputFile(
+            csv_content.encode("utf-8-sig"), filename=filename
+        ),
+        caption="Ваш финансовый отчёт",
+        reply_markup=main_menu,
+    )
+    await callback_query.message.delete()
+    await callback_query.answer()
 
 
 async def main():
