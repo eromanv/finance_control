@@ -5,7 +5,7 @@ from pydantic import BaseModel
 
 
 class CategoryENUM(str, Enum):
-    FASTFOOD = "фастфуд"
+    FASTFOOD = "фастфуд - съел сам"
     FOOD = "еда"
     CHILD = "ребенку"
     ENTERTAINMENT = "развлечения"
