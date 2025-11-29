@@ -20,6 +20,7 @@ class CategoryENUM(str, Enum):
     CREDITS = "кредиты"
     CARSHARING = "каршеринг"
     MEDICINE = "медицина"
+    SUBSCRIPTIONS = "подписки"
 
 
 class ExpenseCreateSchema(BaseModel):
